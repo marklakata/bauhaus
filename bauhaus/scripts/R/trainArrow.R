@@ -32,14 +32,21 @@ logging::basicConfig()
 parser <- ArgumentParser()
 parser$add_argument("alnFilesDir", nargs=1,
                     help="Directory containing alignmentsets and references (available as prefix.ref.fa")
+parser$add_argument("--seed", nargs=1, type="integer", default=42,
+                    help="seed value for setSeed")
+parser$add_argument("--zmwsPerBam", nargs=1, type="integer", default=5000,
+                    help="number of ZMWs to sample ber BAM file")
+parser$add_argument("--targetAlnLength", nargs=1, type="integer", default=140,
+                    help="target length of alignment slices")
+parser$add_argument("-o", "--output", nargs=1, default=getwd(),
+                    help="output directory [default = \"%(default)s\"]")
 ## TODO(dalexander): fix restriction above
-args <- parser$parse_args()
-
+args <- list(alnFilesDir=normalizePath(getwd()), seed=42, zmwsPerBam=5000, targetAlnLength=140)
+try(args <- parser$parse_args(), silent = T)
+set.seed(args$seed)
 
 ###### DEFINITIONS #######
 use8Contexts    = F
-zmwsPerBam      = 5000
-targetAlnLength = 140
 
 ###### LOAD DATA ########
 loginfo("Loading BAM indices")
@@ -52,10 +59,10 @@ getSamples <- function(i) {
   alnFile = alnFiles[[i]]
   loginfo("Loading samples from %s", alnFile)
   pbi = indexes[[i]]
-  sampled_data = pbi[sample(nrow(pbi), min(nrow(pbi), zmwsPerBam)),]
+  sampled_data = pbi[sample(nrow(pbi), min(nrow(pbi), args$zmwsPerBam)),]
   large_alns = loadAlnsFromIndex(sampled_data, paste(alnFile, ".ref.fa", sep=""))
-  f_large_alns = Filter(function(x) nrow(x) > targetAlnLength, large_alns)
-  small_alns = lapply(f_large_alns, function(x) trimAlignment(x, trimToLength = targetAlnLength))
+  f_large_alns = Filter(function(x) nrow(x) > args$targetAlnLength, large_alns)
+  small_alns = lapply(f_large_alns, function(x) trimAlignment(x, trimToLength = args$targetAlnLength))
   small_alns
 }
 alns = lapply(1:length(indexes), getSamples)
@@ -137,7 +144,7 @@ cleanFit <- function(fit)
 }
 loginfo("Saving fit data")
 fit.cleaned <- cleanFit(fit)
-save(fit.cleaned, file="fit.rda", compress=TRUE)
+save(fit.cleaned, file=file.path(args$output, "fit.rda"), compress=TRUE)
 
 # Get RANGE of SNR values fit for clamping
 loginfo("Calculating SNR clamp range")
@@ -163,9 +170,9 @@ outputModelToCpp <- function(fit, fname)
   if (file.exists(fname)) file.remove(fname)
 
   outputEmissions <- function(fit, fname) {
-    mats = list(list(m=fit$mPmf, n="matchPmf"),
-                list(m=fit$bPmf, n="branchPmf"),
-                list(m=fit$sPmf, n="stickPmf"))
+    mats = list(list(m=data.matrix(fit$mPmf), n="matchPmf"),
+                list(m=data.matrix(fit$bPmf), n="branchPmf"),
+                list(m=data.matrix(fit$sPmf), n="stickPmf"))
     renderMatrix <- function(mat) {
         renderRow <- function(i) {
             paste("        {",
@@ -203,7 +210,7 @@ outputModelToCpp <- function(fit, fname)
     }
     val <- paste(
       "constexpr double transProbs[CONTEXT_NUMBER][3][4] = {\n",
-      paste(sapply(fit$models, function(m) renderMatrix(m$cfit, fit$ctxs[m$ctx + 1])),
+      paste(sapply(fit$models, function(m) renderMatrix(m$cfit, m$ctx)),
             collapse=",\n"),
                  "};\n",
                  sep="")
@@ -213,7 +220,7 @@ outputModelToCpp <- function(fit, fname)
   outputEmissions(fit, fname)
   outputTransitions(fit, fname)
 }
-outputModelToCpp(fit, "fit.cpp")
+outputModelToCpp(fit, file.path(args$output, "fit.cpp"))
 
 
 ### OUTPUT TO JSON FILE ###
@@ -229,7 +236,7 @@ extractTransitionArray <- function(fit)
         unclass(cos)
     }
     array(data=lapply(fit$models,
-                 function(m) extractTransitonMatrix(m$cfit, fit$ctxs[m$ctx + 1])))
+                 function(m) extractTransitonMatrix(m$cfit, m$ctx)))
 
 }
 
@@ -241,12 +248,12 @@ outputModelToJson <- function(fit, snrRanges)
   x$ModelForm             <- unbox("PwSnr")
   x$SnrRanges             <- snrRanges
   x$EmissionParameters    <- array(data=as.array(list(
-                                       fit$mPmf[,1:12],
-                                       fit$bPmf[,1:12],
-                                       fit$sPmf[,1:12])))
+                                         data.matrix(fit$mPmf)[,1:12],
+                                         data.matrix(fit$bPmf)[,1:12],
+                                         data.matrix(fit$sPmf)[,1:12])))
   x$TransitionParameters  <- extractTransitionArray(fit)
   x$CounterWeight         <- unbox(3.0)  # TODO: how do we get this right?
-  jsonOut <- file("fit.json", "wt")
+  jsonOut <- file(file.path(args$output, "fit.json"), "wt")
   cat(toJSON(x, digits=I(9), pretty=TRUE), file=jsonOut)
   close(jsonOut)
 }
@@ -258,23 +265,20 @@ outputModelToJson(fit, snrRanges)
 loginfo("Plotting emission, transition probabilities")
 
 plotEmissions <- function(fit, fname) {
-  lvs  = rep(c(levels(training_data[[1]]$outcome), rep("N:N", 5)), 16)
-  ctxs = c(sapply(fit$ctxs, function(z) rep(z, 17)))
   mats = list(fit$mPmf, fit$bPmf, fit$sPmf)
   titles = c("Match", "Cognate Extra", "Non-Cognate Extra")
   titles = paste(titles, "State Emission Probabilites")
   pdf(fname, width=12, height=12)
   for(i in 1:3) {
-    mat = mats[[i]]
-    df = data.frame(outcome = lvs, ctx=ctxs, prob =as.vector(t(mat)))
+    df = reshape2::melt(mats[[i]], id.vars="CTX", value.name="prob", variable.name="outcome")
     df$BP = sapply(as.character(df$outcome), function(x) strsplit(x, ":")[[1]][2])
-    q = ggplot(df, aes(x=outcome,y=prob, fill=BP)) + geom_bar(stat="identity") + facet_wrap(~ctx) +
-      theme_bw(base_size=10) + labs(x="PW:BP", y="Emission Probability", title=titles[i])
+    q = ggplot(df, aes(x=outcome, y=prob, fill=BP)) + geom_bar(stat="identity") + facet_wrap(~CTX) +
+      theme_bw(base_size=10) + labs(x="PW:BP", y="Emission Probability", title=titles[i]) + ylim(0, 1)
     print(q)
   }
   quiet <- capture.output(dev.off())
 }
-plotEmissions(fit, paste("Emissions.pdf"))
+plotEmissions(fit, file.path(args$output, "Emissions.pdf"))
 
 
 plotTransProbsFull <- function(fit, fname) {
@@ -282,18 +286,18 @@ plotTransProbsFull <- function(fit, fname) {
   for(i in 1:length(fit$models)) {
     cmodel = fit$models[[i]]$cfit
     tg = data.frame(cbind(predict(cmodel, type="probs")))
-    colnames(tg) <- c("Match", "Branch", "Stick", "Delete")
+    colnames(tg) <- c("Match", "Cognate Extra", "Non-Cognate Extra", "Delete")
     snr = model.matrix(cmodel)[,2]
     tg$SNR = snr
-    ctx = fit$ctxs[fit$models[[i]]$ctx + 1]
-    tp = reshape2::melt(tg, id.vars = "SNR", value.name="rate", variable.name="Transition")
-    v = ggplot(tp, aes(x=SNR, y =rate)) + geom_smooth(fill=NA) + facet_wrap(~Transition, scales="free") + labs(title=paste(ctx,"Rate Estimates")) + theme_bw() +
+    ctx = fit$models[[i]]$ctx
+    tp = reshape2::melt(tg, id.vars="SNR", value.name="rate", variable.name="Transition")
+    v = ggplot(tp, aes(x=SNR, y=rate)) + geom_smooth(fill=NA) + facet_wrap(~Transition, scales="free") + labs(title=paste(ctx,"Rate Estimates")) + theme_bw() +
       scale_y_continuous(label=percent)
     print(v)
   }
   quiet <- capture.output(dev.off())
 }
-plotTransProbsFull(fit, "Transitions.pdf")
+plotTransProbsFull(fit, file.path(args$output, "Transitions.pdf"))
 
 
 loginfo("Done!")
