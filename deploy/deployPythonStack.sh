@@ -5,7 +5,7 @@
 
 
 module purge
-module load gcc/4.8.4 python/2.7.9 virtualenv zlib/1.2.5 openblas/0.2.14
+module load gcc/4.8.4 python/2.7.9 zlib/1.2.5 openblas/0.2.14
 
 set -euo pipefail
 set -x
@@ -17,7 +17,7 @@ BAUHAUS_VE=/tmp/VE-Bauhaus
 rm -rf $BAUHAUS_VE
 
 set +u
-virtualenv $BAUHAUS_VE
+/mnt/software/v/virtualenv/13.0.1/virtualenv.py  $BAUHAUS_VE
 source $BAUHAUS_VE/bin/activate
 set -u
 
