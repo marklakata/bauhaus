@@ -52,8 +52,9 @@ as a small diff.
   
   rule variantCalling
     command = $gridSMP $ncpus variantCaller $modelPath $modelSpec $
-        --algorithm=arrow $coverageLimitArgument -x0 -q0 -j $ncpus $in -r $
-        $reference -o $out -o $consensusFasta -o $consensusFastq
+        --algorithm=arrow $coverageLimitArgument -x0 -q0 -j $ncpus $
+        --reportEffectiveCoverage $in -r $reference -o $out -o $
+        $consensusFasta -o $consensusFastq
   
   rule maskVariantsGff
     command = gffsubtract.pl $in $referenceMask > $out
