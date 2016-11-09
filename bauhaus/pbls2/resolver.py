@@ -111,7 +111,11 @@ class Resolver(object):
 
     def resolveReference(self, referenceName):
         referenceFasta = op.join(self.REFERENCES_ROOT, referenceName, "sequence", referenceName + ".fasta")
-        if op.isfile(referenceFasta):
+        if op.isfile(referenceName):
+            if not op.isfile(referenceName + ".fai"):
+                return DataNotFound("missing .fai index file for " + referenceName)
+            return referenceName
+        elif op.isfile(referenceFasta):
             return referenceFasta
         elif not op.exists(self.REFERENCES_ROOT):
             raise ResolverFailure("NFS unavailable?")
