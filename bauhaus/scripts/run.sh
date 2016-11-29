@@ -10,5 +10,6 @@ module load R/3.2.3-bauhaus
 THISDIR=$(cd "$(dirname "$0")" && pwd)
 cd $THISDIR
 export PATH=$THISDIR/scripts:$PATH
+export NINJA_STATUS="[%f/%t] [Elapsed: %e] "
 
 ~dalexander/bin/ninja -v -k 1 | tee ninja.log
