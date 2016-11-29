@@ -59,14 +59,16 @@ def genMappingCCS(pflow, ccsSets, reference):
                 buildVariables).outputs)
     return genDatasetMergeForCondition(pflow, alignmentSets, "ccs_mapping", "consensusalignments")
 
-def genChunkedMapping(pflow, subreadSets, reference, splitFactor=8, doMerge=False):
+def genChunkedMapping(pflow, subreadSets, reference, splitFactor=8, doMerge=False, extraBlasrArgs=""):
     """
     Break the subreads set into chunks, map the chunks, then
     consolidate the mapped chunks
     """
+    extraPbalignArgs = "--algorithmOptions=\\'%s\\'" % (extraBlasrArgs,) if extraBlasrArgs else ""
+    pbalignCmd = "pbalign %s --nproc $ncpus $in $reference $out" % (extraPbalignArgs,)
     mapRule = pflow.genRuleOnce(
         "map",
-        "$gridSMP $ncpus pbalign --nproc $ncpus $in $reference $out")
+        "$gridSMP $ncpus %s" % (pbalignCmd,))
     alignmentSets = []
     for subreadSet in subreadSets:
         with pflow.context("movieName", movieName(subreadSet)):
