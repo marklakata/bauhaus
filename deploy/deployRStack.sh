@@ -22,5 +22,5 @@ echo "$(R -q -e 'print(.libPaths())')"
 
 R -q -e 'install.packages(c("Rcpp", "RcppEigen"), repos="http://cran.us.r-project.org", lib="/mnt/secondary/Share/MLG/Bauhaus/R_libs")'
 R -q -e 'install.packages(c("argparse", "argparser", "data.table", "devtools", "digest", "doMC", "doParallel", "dplyr", "feather", "ggplot2", "", "gridExtra", "gtools", "logging", "plyr", "tidyr", "wesanderson", "xml2"), repos="http://cran.us.r-project.org", lib="/mnt/secondary/Share/MLG/Bauhaus/R_libs")'
-R -q -e 'library(devtools) ; install_github("PacificBiosciences/pbbamr", ref="4597ce0035603cf147e6639085b7e39e90973cc4", lib="/mnt/secondary/Share/MLG/Bauhaus/R_libs")'
+R -q -e 'library(devtools) ; install_github("PacificBiosciences/pbbamr", lib="/mnt/secondary/Share/MLG/Bauhaus/R_libs")'
 R -q -e 'library(devtools) ; install_git("http://bitbucket.nanofluidics.com:7990/scm/sat/unitem-sat.git", lib="/mnt/secondary/Share/MLG/Bauhaus/R_libs")'
