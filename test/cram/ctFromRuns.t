@@ -33,7 +33,7 @@ as a small diff.
   
   # Rules
   rule copySubreadsDataset
-    command = dataset create $out $in
+    command = $grid dataset create $out $in
   
   rule map
     command = $gridSMP $ncpus pbalign  --nproc $ncpus $in $reference $out
