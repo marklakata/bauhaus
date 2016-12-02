@@ -36,7 +36,7 @@ as a small diff.
     command = dataset create $out $in
   
   rule map
-    command = $gridSMP $ncpus pbalign  --nproc $ncpus $in $reference $out
+    command = $gridSMP $ncpus pbalign --nproc $ncpus $in $reference $out
   
   rule splitByZmw
     command = $grid dataset split --zmws --targetSize 1 --chunks 8 --outdir $
