@@ -109,6 +109,8 @@ doTitrationPlots <- function(tbl)
     ## Implicit variables: Genome, Algorithm
     ## Explicit variables: have the "p_" prefix
     variables <- names(tbl)[grep("^p_|^Genome$|^Algorithm$", names(tbl))]
+    nvals <- lapply(variables, function(x) length(unique(tbl[,x])))
+    variables <- variables[nvals > 1]
     stopifnot(length(variables) %in% c(1,2,3,4))
 
     print(ggplot(tbl, aes(x=Coverage, y=ConcordanceQV, color=Condition)) +
