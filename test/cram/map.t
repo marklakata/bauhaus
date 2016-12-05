@@ -34,7 +34,7 @@ Let's try a very simple mapping job (no chunking)
   
   # Rules
   rule copySubreadsDataset
-    command = dataset create $out $in
+    command = $grid dataset create $out $in
   
   rule map
     command = $gridSMP $ncpus pbalign --nproc $ncpus $in $reference $out
