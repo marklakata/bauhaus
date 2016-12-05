@@ -12,4 +12,4 @@ cd $THISDIR
 export PATH=$THISDIR/scripts:$PATH
 export NINJA_STATUS="[%f/%t] [Elapsed: %e] "
 
-~dalexander/bin/ninja -v -k 1 | tee ninja.log
+~dalexander/bin/ninja -j 999 -v -k 1 | tee ninja.log
