@@ -27,7 +27,7 @@ def genMapping(pflow, subreadSets, reference):
     """
     mapRule = pflow.genRuleOnce(
         "map",
-        "$gridSMP $ncpus pbalign --nproc $ncpus $in $reference $out")
+        "$gridSMP $ncpus pbalign --tmpDir=$scratchDir --nproc $ncpus $in $reference $out")
     alignmentSets = []
     for subreadSet in subreadSets:
         with pflow.context("entityName", entityName(subreadSet)):
@@ -47,7 +47,7 @@ def genMappingCCS(pflow, ccsSets, reference):
     """
     mapRule = pflow.genRuleOnce(
         "mapCCS",
-        "$gridSMP $ncpus pbalign --nproc $ncpus $in $reference $out")
+        "$gridSMP $ncpus pbalign --tmpDir=$scratchDir --nproc $ncpus $in $reference $out")
     alignmentSets = []
     for ccsSet in ccsSets:
         with pflow.context("entityName", entityName(ccsSet)):
@@ -65,7 +65,7 @@ def genChunkedMapping(pflow, subreadSets, reference, splitFactor=8, doMerge=Fals
     consolidate the mapped chunks
     """
     extraPbalignArgs = "--algorithmOptions=\\'%s\\'" % (extraBlasrArgs,) if extraBlasrArgs else ""
-    pbalignCmd = "pbalign %s --nproc $ncpus $in $reference $out" % (extraPbalignArgs,)
+    pbalignCmd = "pbalign %s --tmpDir=$scratchDir --nproc $ncpus $in $reference $out" % (extraPbalignArgs,)
     mapRule = pflow.genRuleOnce(
         "map",
         "$gridSMP $ncpus %s" % (pbalignCmd,))

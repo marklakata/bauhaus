@@ -104,6 +104,7 @@ class PFlow(ContextTracker):
             w.variable("ncpus", "8")
             w.variable("grid", "qsub -sync y -cwd -V -b y -e log -o log")
             w.variable("gridSMP", "$grid -pe smp")
+            w.variable("scratchDir", "/scratch")
             w.newline()
             w.comment("Rules")
             for rule in self._rules.iteritems():

@@ -23,6 +23,7 @@ Do variant calling from pre-existing mapping jobs.
   ncpus = 8
   grid = qsub -sync y -cwd -V -b y -e log -o log
   gridSMP = $grid -pe smp
+  scratchDir = /scratch
   
   # Rules
   rule mergeDatasetsForCondition

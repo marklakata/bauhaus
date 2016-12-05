@@ -72,7 +72,7 @@ def genUnrolledMapping(pflow, unrolledReadSets, reference, splitFactor=8, doMerg
     unrolledBlasrOptions = "-hitPolicy leftmost -forwardOnly -fastSDP" # S3.1; future blasr moves to "--" POSIX style
     mapRule = pflow.genRuleOnce(
         "map_unrolled",
-        "$gridSMP $ncpus pbalign --algorithmOptions=\\'%s\\' --nproc $ncpus $in $reference $out" % unrolledBlasrOptions)
+        "$gridSMP $ncpus pbalign --tmpDir=$scratchDir --algorithmOptions=\\'%s\\' --nproc $ncpus $in $reference $out" % unrolledBlasrOptions)
     alignmentSets = []
     for unrolledReadSet in unrolledReadSets:
         with pflow.context("movieName", movieName(unrolledReadSet)):

@@ -31,13 +31,15 @@ Let's try a very simple mapping job (no chunking)
   ncpus = 8
   grid = qsub -sync y -cwd -V -b y -e log -o log
   gridSMP = $grid -pe smp
+  scratchDir = /scratch
   
   # Rules
   rule copySubreadsDataset
     command = $grid dataset create $out $in
   
   rule map
-    command = $gridSMP $ncpus pbalign --nproc $ncpus $in $reference $out
+    command = $gridSMP $ncpus pbalign --tmpDir=$scratchDir --nproc $ncpus $in $
+        $reference $out
   
   rule mergeDatasetsForCondition
     command = $grid dataset merge $out $in
