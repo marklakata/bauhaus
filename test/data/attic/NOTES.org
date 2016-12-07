@@ -1,0 +1,12 @@
+* milhouse_project_2546.csv
+
+  This represents the input CSV used for
+
+  http://milhouse/project/2546/
+
+  which was a experiment comparing consensus performance across three
+  chemistries, three bacterial genomes, and different bins of SnrT.
+
+  The P6-C4 data has already been imported via bax2bam; the remaining
+  data could be imported for comparative purposes when we have Arrow
+  trainings for P5, and P4 chemistries.
