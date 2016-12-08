@@ -1,106 +1,31 @@
 from bauhaus import Workflow
 from bauhaus.experiment import (InputType, UnrolledMappingConditionTable)
+from .mapping import genChunkedMapping
 
 from .datasetOps import *
 
-__all__ = ["UnrolledMappingWorkflow", "UnrolledNoHQMappingWorkfow"]
+__all__ = ["UnrolledNoHQMappingWorkflow"]
 
 # --
 
-# TODO: need unrolled references for asym and sym adapter types... sigh
-
-def genUnrolledReads(pflow, subreadSets):
-    """
-    Use bam2bam to stitch the "unrolled" reads from the bam, giving
-    the unrolled HQ regions as records
-    """
-    # While these are not really "subreads", we create a subreadset
-    # for them.  There is no model in our official ontology for
-    # "unrolled reads" datasets.
-    #
-    # TODO: We could/should move away from this and use the BLASR
-    #       direct unrolling support
-    #
-    # TODO: This does not work on chunked subreadSets!  the ppa tools
-    #       in general don't respect datasets, they just operate on BAM
-    #
-    bam2bamUnrollRule = pflow.genRuleOnce(
-        "unrollReads",
-        "$gridSMP $ncpus bam2bam -j $ncpus --hqregion $subreadsIn $scrapsIn -o $outPrefix &&" +
-        "dataset create --type SubreadSet $out $outBam")
-
-    unrolledReadSets = []
-    for subreadSet in subreadSets:
-        with pflow.context("movieName", movieName(subreadSet)):
-            unrolledReadSets.extend(pflow.genBuildStatement(
-                ["{condition}/unrolled_reads/{movieName}.unrolledreadset.xml"],
-                "unrollReads",
-                [subreadSet],
-                dict(outBam="{condition}/unrolled_reads/{movieName}.hqregions.bam",
-                     outPrefix="{condition}/unrolled_reads/{movieName}",
-                     subreadsIn=subreadsBam(subreadSet),
-                     scrapsIn=scrapsBam(subreadSet))).outputs)
-    return unrolledReadSets
-
-def genUnrolledNoHQReads(pflow, subreadSets):
-    pass
-
-
-# TODO: There is a lot of duplication of code here with the mapping
-# and splitting.  This is really not great; we need a better process.
-
-def genUnrolledReadSetSplit(pflow, unrolledReadSet, splitFactor):
-    # Split by ZMWs.  Returns: [dset]
-    assert splitFactor >= 1
-    pflow.genRuleOnce(
-            "splitByZmw",
-            "$grid dataset split --zmws --targetSize 1 --chunks %d --outdir $outdir $in" % (splitFactor,))
-    movie = movieName(unrolledReadSet)
-    splitOutputs =  [ "{condition}/unrolled_reads_chunks/%s.chunk%d.unrolledreadset.xml" % (movie, i)
-                      for i in xrange(splitFactor) ]
-    buildStmt = pflow.genBuildStatement(splitOutputs,
-                                        "splitByZmw",
-                                        [unrolledReadSet],
-                                        variables={"outdir": "{condition}/unrolled_reads_chunks"})
-    return buildStmt.outputs
-
-
-def genUnrolledMapping(pflow, unrolledReadSets, reference, splitFactor=8, doMerge=False):
-    # TODO here:
-    # 1. chunking
-    # 2. mapping
-    unrolledBlasrOptions = "-hitPolicy leftmost -forwardOnly -fastSDP" # S3.1; future blasr moves to "--" POSIX style
-    mapRule = pflow.genRuleOnce(
-        "map_unrolled",
-        "$gridSMP $ncpus pbalign --tmpDir=$scratchDir --algorithmOptions=\\'%s\\' --nproc $ncpus $in $reference $out" % unrolledBlasrOptions)
-    alignmentSets = []
-    for unrolledReadSet in unrolledReadSets:
-        with pflow.context("movieName", movieName(unrolledReadSet)):
-            alignmentSetChunks = []
-            unrolledReadSetChunks = genUnrolledReadSetSplit(pflow, unrolledReadSet, splitFactor)
-            for (i, unrolledReadSetChunk) in enumerate(unrolledReadSetChunks):
-                with pflow.context("chunkNum", i):
-                    buildVariables = dict(reference=reference)
-                    buildStmt = pflow.genBuildStatement(
-                        ["{condition}/unrolled_mapping_chunks/{movieName}.chunk{chunkNum}.unrolledalignmentset.xml"],
-                        "map_unrolled",
-                        [unrolledReadSetChunk],
-                        buildVariables)
-                    alignmentSetChunks.extend(buildStmt.outputs)
-            if doMerge:
-                alignmentSets.extend(
-                    genDatasetConsolidateForMovie(pflow, alignmentSetChunks, "unrolled_mapping", "unrolledalignmentset"))
-            else:
-                alignmentSets.extend(alignmentSetChunks)
-    return genDatasetMergeForCondition(pflow, alignmentSets, "unrolled_mapping", "unrolledalignmentset")
-
+def genUnrolledNoHQMapping(pflow, subreadSets, reference, splitFactor=8, doMerge=False):
+    unrolledPbalignOptions = "--noSplitSubreads --hitPolicy=leftmost"
+    unrolledBlasrOptions = "--bestn 1 --forwardOnly --fastMaxInterval --maxAnchorsPerPosition 30000 --ignoreHQRegions --minPctIdentity 60"
+    return genChunkedMapping(pflow, subreadSets, reference, splitFactor, doMerge,
+                             extraPbalignArgs=unrolledPbalignOptions,
+                             extraBlasrArgs=unrolledBlasrOptions)
 
 # --
 
-class UnrolledMappingWorkflow(Workflow):
+# TODO: I am actually not even sure whether BLASR supports unrolled
+# mapping while still respecting the HQ region.  We would like to have
+# such a workflow...
+
+
+class UnrolledNoHQMappingWorkflow(Workflow):
     @staticmethod
     def name():
-        return "UnrolledMapping"
+        return "UnrolledNoHQMapping"
 
     @staticmethod
     def conditionTableType():
@@ -112,16 +37,8 @@ class UnrolledMappingWorkflow(Workflow):
             with pflow.context("condition", condition):
                 reference = ct.reference(condition)
                 if ct.inputType == InputType.SubreadSet:
-                    unrolledReads = genUnrolledReads(pflow, ct.inputs(condition))
-                    outputDict[condition] = genUnrolledMapping(pflow, unrolledReads, reference, splitFactor=8)
+                    outputDict[condition] = genUnrolledNoHQMapping(
+                        pflow, ct.inputs(condition), reference, splitFactor=8)
                 else:
                     raise NotImplementedError, "Support not yet implemented for this input type"
         return outputDict
-
-class UnrolledNoHQMappingWorkfow(Workflow):
-    @staticmethod
-    def name():
-        return "UnrolledNoHQMapping"
-
-
-#
