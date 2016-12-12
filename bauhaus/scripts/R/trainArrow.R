@@ -132,6 +132,8 @@ cleanFit <- function(fit)
     mdl$cfit$residuals = NULL
     #mdl$cfit$weights = NULL
     mdl$toUse = NULL
+    # Save the model to allow for plotting of TransitionPs
+    mdl$model.matrix = model.matrix(mdl$cfit)
     attr(mdl$cfit$terms, ".Environment") <- NULL
     attr(mdl$cfit$terms, "dataClasses") <- NULL
     attr(mdl$cfit$terms, "predvars") <- NULL
@@ -278,7 +280,7 @@ plotEmissions <- function(fit, fname) {
   }
   quiet <- capture.output(dev.off())
 }
-plotEmissions(fit, file.path(args$output, "Emissions.pdf"))
+plotEmissions(fit.cleaned, file.path(args$output, "Emissions.pdf"))
 
 
 plotTransProbsFull <- function(fit, fname) {
@@ -287,7 +289,7 @@ plotTransProbsFull <- function(fit, fname) {
     cmodel = fit$models[[i]]$cfit
     tg = data.frame(cbind(predict(cmodel, type="probs")))
     colnames(tg) <- c("Match", "Cognate Extra", "Non-Cognate Extra", "Delete")
-    snr = model.matrix(cmodel)[,2]
+    snr = fit$models[[i]]$model.matrix[,2]
     tg$SNR = snr
     ctx = fit$models[[i]]$ctx
     tp = reshape2::melt(tg, id.vars="SNR", value.name="rate", variable.name="Transition")
@@ -297,7 +299,7 @@ plotTransProbsFull <- function(fit, fname) {
   }
   quiet <- capture.output(dev.off())
 }
-plotTransProbsFull(fit, file.path(args$output, "Transitions.pdf"))
+plotTransProbsFull(fit.cleaned, file.path(args$output, "Transitions.pdf"))
 
 
 loginfo("Done!")
